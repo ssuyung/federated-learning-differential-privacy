@@ -85,7 +85,9 @@ class FLClient(nn.Module):
                     for name, param in self.model.named_parameters():
                         clipped_grads[name] += param.grad 
                     self.model.zero_grad()
-                    
+
+            # print(np.linalg.norm(clipped_grads, 2))
+            
             # add Gaussian noise
             for name, param in self.model.named_parameters():
                 clipped_grads[name] += gaussian_noise(clipped_grads[name].shape, self.clip, self.sigma, device=self.device)
