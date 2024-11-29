@@ -4,6 +4,8 @@ from torch import nn
 from torch.utils.data import Dataset, DataLoader, TensorDataset
 from utils import gaussian_noise
 from rdp_analysis import calibrating_sampled_gaussian
+import matplotlib.pyplot as plt
+
 
 from MLModel import *
 
@@ -40,6 +42,8 @@ class FLClient(nn.Module):
         self.E = E
         self.clip = clip
         self.q = q
+        self.grad = []
+        self.noise = []
         if model == 'scatter':
             self.model = ScatterLinear(81, (7, 7), input_norm="GroupNorm", num_groups=27).to(self.device)
         else:
@@ -89,9 +93,15 @@ class FLClient(nn.Module):
             # print(np.linalg.norm(clipped_grads, 2))
             
             # add Gaussian noise
+            noise_ls = []
             for name, param in self.model.named_parameters():
-                clipped_grads[name] += gaussian_noise(clipped_grads[name].shape, self.clip, self.sigma, device=self.device)
-                
+                noise = gaussian_noise(clipped_grads[name].shape, self.clip, self.sigma, device=self.device)
+                clipped_grads[name] += noise
+                noise_ls.append(noise)
+
+            self.grad.append(np.array(list(clipped_grads.values().cpu())).mean())
+            self.noise.append(sum(noise_ls)/len(noise_ls))
+
             # scale back
             for name, param in self.model.named_parameters():
                 clipped_grads[name] /= (self.data_size*self.q)
@@ -101,6 +111,23 @@ class FLClient(nn.Module):
             
             # update local model
             optimizer.step()
+        # Generate x values (indices of the lists)
+        x = list(range(len(self.grad)))
+
+        # Plot both lines
+        plt.figure(figsize=(10, 6))  # Set the figure size
+        plt.plot(x, self.grad, label='Gradient Line', color='blue', marker='o')
+        plt.plot(x, self.noise, label='Noise Line', color='red', linestyle='--')
+
+        # Add titles, labels, and legend
+        plt.title('Line Chart of Gradient and Noise', fontsize=14)
+        plt.xlabel('Index', fontsize=12)
+        plt.ylabel('Value', fontsize=12)
+        plt.legend(fontsize=12)
+
+        # Display the grid and plot
+        plt.grid(True)
+        plt.show()
 
 
 
