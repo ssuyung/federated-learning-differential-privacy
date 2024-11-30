@@ -7,6 +7,7 @@ from torchvision import datasets, transforms
 import torch
 import numpy as np
 import os
+import pandas as pd
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -58,17 +59,19 @@ fl_param = {
     'model': MNIST_CNN,
     'data': d,
     'lr': lr,
-    'E': 5,
+    'E': 30,
     'C': 1,
     'eps': 4.0,
     'delta': 1e-5,
     'q': 0.01,
     'clip': 0.1,
-    'tot_T': 10,
+    'tot_T': 100,
     'batch_size': 128,
     'device': device,
     'noise_level': 0.1,
     'noise_gamma': 0.99,   # noise_level = noise_level * noise_gamma for every local epoch
+    'fixed_sigma': True,
+    'sigma' : 3
 }
 
 fl_entity = FLServer(fl_param).to(device)
@@ -83,6 +86,10 @@ for t in range(fl_param['tot_T']):
 
 # Generate x values (indices of the lists)
 x = list(range(len(acc)))
+
+dictt = {'accuracy': acc}
+df = pd.DataFrame(dictt)
+df.to_csv(f'./results/csv/gaussian_{fl_param["sigma"]*100}.csv')
 
 # Plot both lines
 plt.figure(figsize=(10, 6))  # Set the figure size

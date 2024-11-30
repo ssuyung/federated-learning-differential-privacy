@@ -35,11 +35,11 @@ def mnist_noniid(labels, num_users):
     return dict_users
 
 
-def gaussian_noise(data, s, sigma, device=None):
+def gaussian_noise(data, s, sigma, fixed_sigma, device=None):
     """
     Gaussian noise
     """
-    return torch.normal(0, data.reshape(-1).float().std(), data.shape).to(device)
+    return torch.normal(0, sigma if fixed_sigma else data.reshape(-1).float().std(), data.shape).to(device)
 
 def laplace_noise(data, s, sigma, device=None):
     """

@@ -19,7 +19,7 @@ class FLClient(nn.Module):
         2. Perform local training (compute gradients)
         3. Return local model (gradients) to server
     """
-    def __init__(self, model, output_size, data, lr, E, batch_size, q, clip, sigma, noise_level, noise_gamma, device=None):
+    def __init__(self, model, output_size, data, lr, E, batch_size, q, clip, sigma, noise_level, noise_gamma, fixed_sigma, device=None):
         """
         :param model: ML model's training process should be implemented
         :param data: (tuple) dataset, all data in client side is used as training data
@@ -46,6 +46,7 @@ class FLClient(nn.Module):
         # self.noise = []
         self.noise_level = noise_level
         self.noise_gamma = noise_gamma
+        self.fixed_sigma = fixed_sigma
 
         if model == 'scatter':
             self.model = ScatterLinear(81, (7, 7), input_norm="GroupNorm", num_groups=27).to(self.device)
@@ -98,7 +99,7 @@ class FLClient(nn.Module):
             # add Gaussian noise
             noise_ls = []
             for name, param in self.model.named_parameters():
-                noise = self.noise_level * gaussian_noise(clipped_grads[name], self.clip, self.sigma, device=self.device)
+                noise = self.noise_level * gaussian_noise(clipped_grads[name], self.clip, self.sigma, self.fixed_sigma, device=self.device)
                 # print(abs(noise/clipped_grads[name]).mean())
                 clipped_grads[name] += noise
                 # print(np.linalg.norm(clipped_grads[name].reshape(-1), 2).mean())
@@ -166,9 +167,9 @@ class FLServer(nn.Module):
         # compute noise using moments accountant
         # self.sigma = compute_noise(1, fl_param['q'], fl_param['eps'], fl_param['E']*fl_param['tot_T'], fl_param['delta'], 1e-5)
         
+        self.fixed_sigma = fl_param['fixed_sigma']
         # calibration with subsampeld Gaussian mechanism under composition 
-        # self.sigma = calibrating_sampled_gaussian(fl_param['q'], fl_param['eps'], fl_param['delta'], iters=fl_param['E']*fl_param['tot_T'], err=1e-3)
-        self.sigma = 0.6
+        self.sigma = fl_param['sigma'] if self.fixed_sigma else calibrating_sampled_gaussian(fl_param['q'], fl_param['eps'], fl_param['delta'], iters=fl_param['E']*fl_param['tot_T'], err=1e-3)
         print("noise scale =", self.sigma)
         
         
@@ -183,6 +184,7 @@ class FLServer(nn.Module):
                                  self.sigma,
                                  fl_param['noise_level'],
                                  fl_param['noise_gamma'],
+                                 fl_param['fixed_sigma'],
                                  self.device)
                         for i in range(self.client_num)]
         
