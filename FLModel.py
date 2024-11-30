@@ -19,7 +19,7 @@ class FLClient(nn.Module):
         2. Perform local training (compute gradients)
         3. Return local model (gradients) to server
     """
-    def __init__(self, model, output_size, data, lr, E, batch_size, q, clip, sigma, device=None):
+    def __init__(self, model, output_size, data, lr, E, batch_size, q, clip, sigma, noise_level, noise_gamma, device=None):
         """
         :param model: ML model's training process should be implemented
         :param data: (tuple) dataset, all data in client side is used as training data
@@ -42,8 +42,11 @@ class FLClient(nn.Module):
         self.E = E
         self.clip = clip
         self.q = q
-        self.grad = []
-        self.noise = []
+        # self.grad = []
+        # self.noise = []
+        self.noise_level = noise_level
+        self.noise_gamma = noise_gamma
+
         if model == 'scatter':
             self.model = ScatterLinear(81, (7, 7), input_norm="GroupNorm", num_groups=27).to(self.device)
         else:
@@ -95,13 +98,17 @@ class FLClient(nn.Module):
             # add Gaussian noise
             noise_ls = []
             for name, param in self.model.named_parameters():
-                noise = gaussian_noise(clipped_grads[name].shape, self.clip, self.sigma, device=self.device)
+                noise = self.noise_level * gaussian_noise(clipped_grads[name], self.clip, self.sigma, device=self.device)
+                # print(abs(noise/clipped_grads[name]).mean())
                 clipped_grads[name] += noise
-                noise_ls.append(noise)
+                # print(np.linalg.norm(clipped_grads[name].reshape(-1), 2).mean())
+                # noise_ls.append(np.linalg.norm(clipped_grads[name].cpu().reshape(-1), 2).mean())
 
-            self.grad.append(np.array(list(clipped_grads.values().cpu())).mean())
-            self.noise.append(sum(noise_ls)/len(noise_ls))
-
+            # self.grad.append(np.array(list(clipped_grads.values())).mean())
+            # print(np.mean(noise_ls))
+            # self.noise.append(np.mean(noise_ls))
+            # print("grad: ", np.shape(clipped_grads))
+            # print("noise: ", np.shape(noise_ls))
             # scale back
             for name, param in self.model.named_parameters():
                 clipped_grads[name] /= (self.data_size*self.q)
@@ -109,25 +116,27 @@ class FLClient(nn.Module):
             for name, param in self.model.named_parameters():
                 param.grad = clipped_grads[name]
             
+            self.noise_level *= self.noise_gamma
             # update local model
             optimizer.step()
-        # Generate x values (indices of the lists)
-        x = list(range(len(self.grad)))
+        # # Generate x values (indices of the lists)
+        # x = list(range(len(self.noise)))
+        # print(x)
+        # # Plot both lines
+        # plt.figure(figsize=(10, 6))  # Set the figure size
+        # # plt.plot(x, self.noise, label='Gradient Line', color='blue', marker='o')
+        # plt.plot(x, self.noise, label='Grad Line', color='red', linestyle='--')
 
-        # Plot both lines
-        plt.figure(figsize=(10, 6))  # Set the figure size
-        plt.plot(x, self.grad, label='Gradient Line', color='blue', marker='o')
-        plt.plot(x, self.noise, label='Noise Line', color='red', linestyle='--')
+        # # Add titles, labels, and legend
+        # # plt.title('Gradient', fontsize=14)
+        # plt.xlabel('Index', fontsize=12)
+        # plt.ylabel('Value', fontsize=12)
+        # plt.legend(fontsize=12)
 
-        # Add titles, labels, and legend
-        plt.title('Line Chart of Gradient and Noise', fontsize=14)
-        plt.xlabel('Index', fontsize=12)
-        plt.ylabel('Value', fontsize=12)
-        plt.legend(fontsize=12)
-
-        # Display the grid and plot
-        plt.grid(True)
-        plt.show()
+        # # Display the grid and plot
+        # plt.grid(True)
+        # # plt.show()
+        # plt.savefig('results/plots/histogram.png', format='png', dpi=300)
 
 
 
@@ -158,8 +167,10 @@ class FLServer(nn.Module):
         # self.sigma = compute_noise(1, fl_param['q'], fl_param['eps'], fl_param['E']*fl_param['tot_T'], fl_param['delta'], 1e-5)
         
         # calibration with subsampeld Gaussian mechanism under composition 
-        self.sigma = calibrating_sampled_gaussian(fl_param['q'], fl_param['eps'], fl_param['delta'], iters=fl_param['E']*fl_param['tot_T'], err=1e-3)
+        # self.sigma = calibrating_sampled_gaussian(fl_param['q'], fl_param['eps'], fl_param['delta'], iters=fl_param['E']*fl_param['tot_T'], err=1e-3)
+        self.sigma = 0.6
         print("noise scale =", self.sigma)
+        
         
         self.clients = [FLClient(fl_param['model'],
                                  fl_param['output_size'],
@@ -170,6 +181,8 @@ class FLServer(nn.Module):
                                  fl_param['q'],
                                  fl_param['clip'],
                                  self.sigma,
+                                 fl_param['noise_level'],
+                                 fl_param['noise_gamma'],
                                  self.device)
                         for i in range(self.client_num)]
         
