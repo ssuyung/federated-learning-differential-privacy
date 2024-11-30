@@ -161,6 +161,7 @@ class FLServer(nn.Module):
         self.C = fl_param['C']      # (float) C in [0, 1]
         self.clip = fl_param['clip']
         self.T = fl_param['tot_T']  # total number of global iterations (communication rounds)
+        self.noise_type = fl_param.get('noise_type', 'laplacian')
 
         self.data = []
         self.target = []
@@ -175,8 +176,13 @@ class FLServer(nn.Module):
         # self.sigma = compute_noise(1, fl_param['q'], fl_param['eps'], fl_param['E']*fl_param['tot_T'], fl_param['delta'], 1e-5)
         
         # calibration with subsampeld Gaussian mechanism under composition 
-        self.sigma = calibrating_sampled_gaussian(fl_param['q'], fl_param['eps'], fl_param['delta'], iters=fl_param['E']*fl_param['tot_T'], err=1e-3)
-        print("noise scale =", self.sigma)
+        if fl_param['noise_type'] == 'gaussian':
+            self.sigma = calibrating_sampled_gaussian(fl_param['q'], fl_param['eps'], fl_param['delta'], iters=fl_param['E']*fl_param['tot_T'], err=1e-3)
+            print("Gaussian noise scale =", self.sigma)
+        elif fl_param['noise_type'] == 'laplacian':
+            self.epsilon = fl_param['epsilon']
+            print("Laplacian noise epsilon =", self.epsilon)
+
         
         self.clients = [FLClient(fl_param['model'],
                                  fl_param['output_size'],
