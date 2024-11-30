@@ -40,3 +40,29 @@ def gaussian_noise(data_shape, s, sigma, device=None):
     Gaussian noise
     """
     return torch.normal(0, sigma * s, data_shape).to(device)
+
+def laplacian_noise(data_shape, clip, epsilon, device=None):
+    """
+    Generate Laplacian noise for differential privacy.
+    :param data_shape: The shape of the gradient tensor to which noise will be added.
+    :param clip: Gradient clipping bound (L1 sensitivity).
+    :param epsilon: Privacy budget for the Laplacian mechanism.
+    :param device: Device to place the noise tensor (CPU or GPU).
+    :return: Tensor of Laplacian noise.
+    """
+    scale = clip / epsilon  # Scale parameter for Laplacian distribution
+    noise = torch.tensor(np.random.laplace(loc=0, scale=scale, size=data_shape), device=device)
+    return noise
+
+def clip_grad_l1(parameters, max_norm): 
+    """
+    Perform L1 gradient clipping.
+    :param parameters: Model parameters (e.g., model.parameters()).
+    :param max_norm: Maximum allowed L1 norm for gradients.
+    """
+    for p in parameters:
+        if p.grad is not None:
+            grad = p.grad
+            grad_norm = torch.sum(torch.abs(grad))
+            if grad_norm > max_norm:
+                p.grad *= max_norm / grad_norm

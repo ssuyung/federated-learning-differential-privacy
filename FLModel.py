@@ -2,7 +2,9 @@
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader, TensorDataset
-from utils import gaussian_noise
+#from utils import gaussian_noise
+from utils import laplacian_noise
+from utils import clip_grad_l1
 from rdp_analysis import calibrating_sampled_gaussian
 import matplotlib.pyplot as plt
 
@@ -19,7 +21,7 @@ class FLClient(nn.Module):
         2. Perform local training (compute gradients)
         3. Return local model (gradients) to server
     """
-    def __init__(self, model, output_size, data, lr, E, batch_size, q, clip, sigma, device=None):
+    def __init__(self, model, output_size, data, lr, E, batch_size, q, clip, sigma, epsilon, device=None):
         """
         :param model: ML model's training process should be implemented
         :param data: (tuple) dataset, all data in client side is used as training data
@@ -38,6 +40,7 @@ class FLClient(nn.Module):
             shuffle=True
         )
         self.sigma = sigma    # DP noise level
+        self.epsilon = epsilon
         self.lr = lr
         self.E = E
         self.clip = clip
@@ -83,24 +86,38 @@ class FLClient(nn.Module):
                 
                 # bound l2 sensitivity (gradient clipping)
                 # clip each of the gradient in the "Lot"
-                for i in range(loss.size()[0]):
+                """for i in range(loss.size()[0]):
                     loss[i].backward(retain_graph=True)
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip)
                     for name, param in self.model.named_parameters():
                         clipped_grads[name] += param.grad 
                     self.model.zero_grad()
 
+                """
+                for i in range(loss.size()[0]):
+                    loss[i].backward(retain_graph=True)
+                    clip_grad_l1(self.model.parameters(), self.clip)
+                    for name, param in self.model.named_parameters():
+                        clipped_grads[name] += param.gra
+                    self.model.zero_grad()
+
             # print(np.linalg.norm(clipped_grads, 2))
             
             # add Gaussian noise
+            # add laplacian noise
             noise_ls = []
             for name, param in self.model.named_parameters():
-                noise = gaussian_noise(clipped_grads[name].shape, self.clip, self.sigma, device=self.device)
+                #noise = gaussian_noise(clipped_grads[name].shape, self.clip, self.sigma, device=self.device)
+                noise = laplacian_noise(clipped_grads[name].shape, self.clip, self.epsilon, device=self.device)
                 clipped_grads[name] += noise
                 noise_ls.append(noise)
 
-            self.grad.append(np.array(list(clipped_grads.values().cpu())).mean())
-            self.noise.append(sum(noise_ls)/len(noise_ls))
+            #Change        
+            #self.grad.append(np.array(list(clipped_grads.values().cpu())).mean())
+            #elf.noise.append(sum(noise_ls)/len(noise_ls))
+            self.grad.append(np.mean([g.cpu().numpy() for g in clipped_grads.values()]))
+            self.noise.append(np.mean(noise_ls))
+            
 
             # scale back
             for name, param in self.model.named_parameters():
@@ -170,6 +187,7 @@ class FLServer(nn.Module):
                                  fl_param['q'],
                                  fl_param['clip'],
                                  self.sigma,
+                                 fl_param['epsilon'],
                                  self.device)
                         for i in range(self.client_num)]
         
