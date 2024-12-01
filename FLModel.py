@@ -21,7 +21,7 @@ class FLClient(nn.Module):
         2. Perform local training (compute gradients)
         3. Return local model (gradients) to server
     """
-    def __init__(self, model, output_size, data, lr, E, batch_size, q, clip, sigma, epsilon, device=None):
+    def __init__(self, model, output_size, data, lr, E, batch_size, q, clip, sigma=None, epsilon=None, device=None):
         """
         :param model: ML model's training process should be implemented
         :param data: (tuple) dataset, all data in client side is used as training data
@@ -98,7 +98,7 @@ class FLClient(nn.Module):
                     loss[i].backward(retain_graph=True)
                     clip_grad_l1(self.model.parameters(), self.clip)
                     for name, param in self.model.named_parameters():
-                        clipped_grads[name] += param.gra
+                        clipped_grads[name] += param.grad
                     self.model.zero_grad()
 
             # print(np.linalg.norm(clipped_grads, 2))
@@ -115,8 +115,10 @@ class FLClient(nn.Module):
             #Change        
             #self.grad.append(np.array(list(clipped_grads.values().cpu())).mean())
             #elf.noise.append(sum(noise_ls)/len(noise_ls))
-            self.grad.append(np.mean([g.cpu().numpy() for g in clipped_grads.values()]))
-            self.noise.append(np.mean(noise_ls))
+            #self.grad.append(np.mean([g.cpu().numpy() for g in clipped_grads.values()]))
+            self.grad.append(np.mean([g.norm().cpu().numpy() for g in clipped_grads.values()]))
+            #self.noise.append(np.mean(noise_ls))
+            self.noise.append(np.mean([n.norm().cpu().numpy() for n in noise_ls]))
             
 
             # scale back
@@ -192,7 +194,7 @@ class FLServer(nn.Module):
                                  fl_param['batch_size'],
                                  fl_param['q'],
                                  fl_param['clip'],
-                                 self.sigma,
+                                 self.sigma if hasattr(self, 'sigma') else None,
                                  fl_param['epsilon'],
                                  self.device)
                         for i in range(self.client_num)]
