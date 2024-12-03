@@ -35,6 +35,7 @@ fl_param = {
     'q': 0.01,           # sampling rate
     'clip': 0.2,         # clipping norm
     'tot_T': 10,         # number of aggregation times (communication rounds)
+    'epsilon': 1.0,
 }
 ```
 
