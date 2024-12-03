@@ -71,7 +71,9 @@ fl_param = {
     'noise_level': 0.1,
     'noise_gamma': 0.99,   # noise_level = noise_level * noise_gamma for every local epoch
     'fixed_sigma': True,
-    'sigma' : 3
+    'sigma' : 3,
+    'noise_type': 'laplacian',
+    'epsilon': 1.0,
 }
 
 fl_entity = FLServer(fl_param).to(device)
