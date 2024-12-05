@@ -65,15 +65,15 @@ fl_param = {
     'delta': 1e-5,
     'q': 0.01,
     'clip': 0.1,
-    'tot_T': 100,
+    'tot_T': 70,
     'batch_size': 128,
     'device': device,
-    'noise_level': 0.1,
-    'noise_gamma': 0.99,   # noise_level = noise_level * noise_gamma for every local epoch
+    'noise_level': 1,
+    'noise_gamma': 0.9999,   # noise_level = noise_level * noise_gamma for every local epoch
     'fixed_sigma': True,
     'sigma' : 3,
     'noise_type': 'laplacian',
-    'epsilon': 1.0,
+    'epsilon':1.0,
 }
 
 fl_entity = FLServer(fl_param).to(device)
@@ -91,7 +91,7 @@ x = list(range(len(acc)))
 
 dictt = {'accuracy': acc}
 df = pd.DataFrame(dictt)
-df.to_csv(f'./results/csv/gaussian_{fl_param["sigma"]*100}.csv')
+df.to_csv(f'./results/csv/laplace_gamma_{fl_param["noise_gamma"]}_{fl_param["epsilon"]*100}.csv')
 
 # Plot both lines
 plt.figure(figsize=(10, 6))  # Set the figure size
