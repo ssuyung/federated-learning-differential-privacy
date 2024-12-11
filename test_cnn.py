@@ -62,14 +62,15 @@ fl_param = {
     'E': 30,
     'C': 1,
     'eps': 4.0,
-    'delta': 1e-5,
+    'dp_delta': 1e-5,
+    'dp_epsilon': 0.5,
     'q': 0.01,
     'clip': 0.1,
     'tot_T': 70,
     'batch_size': 128,
     'device': device,
     'noise_level': 1,
-    'noise_gamma': 0.9999,   # noise_level = noise_level * noise_gamma for every local epoch
+    'noise_gamma': 1,   # noise_level = noise_level * noise_gamma for every local epoch
     'fixed_sigma': True,
     'sigma' : 3,
     'noise_type': 'laplacian',
@@ -91,7 +92,7 @@ x = list(range(len(acc)))
 
 dictt = {'accuracy': acc}
 df = pd.DataFrame(dictt)
-df.to_csv(f'./results/csv/laplace_gamma_{fl_param["noise_gamma"]}_{fl_param["epsilon"]*100}.csv')
+df.to_csv(f'./results/csv/laplacian_gamma_{fl_param["noise_gamma"]}_dp_epsilon_{fl_param["dp_epsilon"]*100}.csv')
 
 # Plot both lines
 plt.figure(figsize=(10, 6))  # Set the figure size
