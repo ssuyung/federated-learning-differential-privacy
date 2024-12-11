@@ -56,7 +56,7 @@ def laplacian_noise(data_shape, clip, epsilon, device=None):
     :param device: Device to place the noise tensor (CPU or GPU).
     :return: Tensor of Laplacian noise.
     """
-    scale = epsilon  # Scale parameter for Laplacian distribution
+    scale = clip/epsilon  # Scale parameter for Laplacian distribution
     noise = torch.tensor(np.random.laplace(loc=0, scale=scale, size=data_shape), device=device)
     return noise
 
