@@ -119,7 +119,7 @@ class FLClient(nn.Module):
                     scale = self.clip * math.sqrt(2*math.log(1.25/self.dp_delta)) / self.dp_epsilon
                     noise = self.noise_level * gaussian_noise(clipped_grads[name], self.clip, scale, self.fixed_sigma, device=self.device)
                 else: 
-                   noise = self.noise_level * laplacian_noise(clipped_grads[name].shape, self.clip, self.epsilon, device=self.device)
+                   noise = self.noise_level * laplacian_noise(clipped_grads[name].shape, self.clip, self.dp_epsilon, device=self.device)
                    #print(self.epsilon)
                 clipped_grads[name] += noise
             #Change        
