@@ -65,7 +65,7 @@ fl_param = {
     'delta': 1e-5,
     'q': 0.01,
     'clip': 0.1,
-    'tot_T': 100,
+    'tot_T': 70,
     'batch_size': 128,
     'device': device,
     'noise_level': 0.1,

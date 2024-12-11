@@ -120,9 +120,9 @@ class FLClient(nn.Module):
             #self.grad.append(np.array(list(clipped_grads.values().cpu())).mean())
             #elf.noise.append(sum(noise_ls)/len(noise_ls))
             #self.grad.append(np.mean([g.cpu().numpy() for g in clipped_grads.values()]))
-            self.grad.append(np.mean([g.norm().cpu().numpy() for g in clipped_grads.values()]))
+            # self.grad.append(np.mean([g.norm().cpu().numpy() for g in clipped_grads.values()]))
             #self.noise.append(np.mean(noise_ls))
-            self.noise.append(np.mean([n.norm().cpu().numpy() for n in noise_ls]))
+            # self.noise.append(np.mean([n.norm().cpu().numpy() for n in noise_ls]))
             
 
             # scale back
@@ -185,6 +185,7 @@ class FLServer(nn.Module):
         
         self.fixed_sigma = fl_param['fixed_sigma']
         # calibration with subsampeld Gaussian mechanism under composition 
+        self.sigma=0
         if fl_param['noise_type'] == 'gaussian':
             self.sigma = fl_param['sigma'] if self.fixed_sigma else calibrating_sampled_gaussian(fl_param['q'], fl_param['eps'], fl_param['delta'], iters=fl_param['E']*fl_param['tot_T'], err=1e-3)
             print("noise scale =", self.sigma)
