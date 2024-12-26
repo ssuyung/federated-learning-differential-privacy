@@ -1,3 +1,5 @@
+# 260D Large Scale ML Project - Federated Learning with Differential Privacy: Decreasing Noise Mechanism
+
 # Federated Learning
 
 This is an implementation of **Federated Learning (FL)** with **Differential Privacy (DP)**. The FL algorithm is FedAvg, based on the paper [Communication-Efficient Learning of Deep Networks from Decentralized Data](https://arxiv.org/abs/1602.05629). Each client trains local model by DP-SGD [2] to perturb model parameters. The noise multiplier is determined by [3-5] (see rdp_analysis.py). 
