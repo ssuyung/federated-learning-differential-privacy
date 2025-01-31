@@ -2,9 +2,11 @@
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader, TensorDataset
-from utils import gaussian_noise
+from utils import gaussian_noise, laplacian_noise
+# from utils import clip_grad_l1
 from rdp_analysis import calibrating_sampled_gaussian
 import matplotlib.pyplot as plt
+import math
 
 
 from MLModel import *
@@ -19,7 +21,8 @@ class FLClient(nn.Module):
         2. Perform local training (compute gradients)
         3. Return local model (gradients) to server
     """
-    def __init__(self, model, output_size, data, lr, E, batch_size, q, clip, sigma, noise_level, noise_gamma, fixed_sigma, device=None):
+    def __init__(self, model, output_size, data, lr, E, batch_size, q, clip, sigma, noise_level=1, noise_gamma=1, fixed_sigma=0, epsilon=None, device=None, noise_type="gaussian", dp_delta=0, dp_epsilon=0):
+    # def __init__(self, model, output_size, data, lr, E, batch_size, q, clip, sigma=None,  device=None):
         """
         :param model: ML model's training process should be implemented
         :param data: (tuple) dataset, all data in client side is used as training data
@@ -38,16 +41,18 @@ class FLClient(nn.Module):
             shuffle=True
         )
         self.sigma = sigma    # DP noise level
+        self.epsilon = epsilon
         self.lr = lr
         self.E = E
         self.clip = clip
         self.q = q
-        # self.grad = []
-        # self.noise = []
+        self.noise_type = noise_type
         self.noise_level = noise_level
         self.noise_gamma = noise_gamma
         self.fixed_sigma = fixed_sigma
-
+        self.dp_epsilon = dp_epsilon
+        self.dp_delta = dp_delta
+        #print(self.dp_delta, self.dp_epsilon)
         if model == 'scatter':
             self.model = ScatterLinear(81, (7, 7), input_norm="GroupNorm", num_groups=27).to(self.device)
         else:
@@ -94,22 +99,38 @@ class FLClient(nn.Module):
                         clipped_grads[name] += param.grad 
                     self.model.zero_grad()
 
+                
+                """
+                for i in range(loss.size()[0]):
+                    loss[i].backward(retain_graph=True)
+                    clip_grad_l1(self.model.parameters(), self.clip)
+                    for name, param in self.model.named_parameters():
+                        clipped_grads[name] += param.grad
+                    self.model.zero_grad()
+                """
+
             # print(np.linalg.norm(clipped_grads, 2))
             
             # add Gaussian noise
+            # add laplacian noise
             noise_ls = []
             for name, param in self.model.named_parameters():
-                noise = self.noise_level * gaussian_noise(clipped_grads[name], self.clip, self.sigma, self.fixed_sigma, device=self.device)
-                # print(abs(noise/clipped_grads[name]).mean())
+                if self.noise_type == 'gaussian': 
+                    scale = self.clip * math.sqrt(2*math.log(1.25/self.dp_delta)) / self.dp_epsilon
+                    noise = self.noise_level * gaussian_noise(clipped_grads[name], self.clip, scale, self.fixed_sigma, device=self.device)
+                else: 
+                   noise = self.noise_level * laplacian_noise(clipped_grads[name].shape, self.clip, self.dp_epsilon, device=self.device)
+                   #print(self.epsilon)
                 clipped_grads[name] += noise
-                # print(np.linalg.norm(clipped_grads[name].reshape(-1), 2).mean())
-                # noise_ls.append(np.linalg.norm(clipped_grads[name].cpu().reshape(-1), 2).mean())
+            #Change        
+            #self.grad.append(np.array(list(clipped_grads.values().cpu())).mean())
+            #elf.noise.append(sum(noise_ls)/len(noise_ls))
+            #self.grad.append(np.mean([g.cpu().numpy() for g in clipped_grads.values()]))
+            #self.grad.append(np.mean([g.norm().cpu().numpy() for g in clipped_grads.values()]))
+            #self.noise.append(np.mean(noise_ls))
+            #self.noise.append(np.mean([n.norm().cpu().numpy() for n in noise_ls]))
+            
 
-            # self.grad.append(np.array(list(clipped_grads.values())).mean())
-            # print(np.mean(noise_ls))
-            # self.noise.append(np.mean(noise_ls))
-            # print("grad: ", np.shape(clipped_grads))
-            # print("noise: ", np.shape(noise_ls))
             # scale back
             for name, param in self.model.named_parameters():
                 clipped_grads[name] /= (self.data_size*self.q)
@@ -117,7 +138,8 @@ class FLClient(nn.Module):
             for name, param in self.model.named_parameters():
                 param.grad = clipped_grads[name]
             
-            self.noise_level *= self.noise_gamma
+            # self.noise_level *= self.noise_gamma
+            self.clip *= self.noise_gamma
             # update local model
             optimizer.step()
         # # Generate x values (indices of the lists)
@@ -154,6 +176,7 @@ class FLServer(nn.Module):
         self.C = fl_param['C']      # (float) C in [0, 1]
         self.clip = fl_param['clip']
         self.T = fl_param['tot_T']  # total number of global iterations (communication rounds)
+        self.noise_type = fl_param['noise_type']
 
         self.data = []
         self.target = []
@@ -169,8 +192,14 @@ class FLServer(nn.Module):
         
         self.fixed_sigma = fl_param['fixed_sigma']
         # calibration with subsampeld Gaussian mechanism under composition 
-        self.sigma = fl_param['sigma'] if self.fixed_sigma else calibrating_sampled_gaussian(fl_param['q'], fl_param['eps'], fl_param['delta'], iters=fl_param['E']*fl_param['tot_T'], err=1e-3)
-        print("noise scale =", self.sigma)
+        self.sigma=0
+        if fl_param['noise_type'] == 'gaussian':
+            self.sigma = fl_param['sigma'] if self.fixed_sigma else calibrating_sampled_gaussian(fl_param['q'], fl_param['eps'], fl_param['delta'], iters=fl_param['E']*fl_param['tot_T'], err=1e-3)
+            print("noise scale =", self.sigma)
+        elif fl_param['noise_type'] == 'laplacian':
+            self.epsilon = fl_param['epsilon']
+            print("Laplacian noise epsilon =", self.epsilon)
+
         
         
         self.clients = [FLClient(fl_param['model'],
@@ -185,7 +214,11 @@ class FLServer(nn.Module):
                                  fl_param['noise_level'],
                                  fl_param['noise_gamma'],
                                  fl_param['fixed_sigma'],
-                                 self.device)
+                                 fl_param['epsilon'],
+                                 self.device,
+                                 fl_param['noise_type'],
+                                 fl_param['dp_delta'],
+                                 fl_param['dp_epsilon'])
                         for i in range(self.client_num)]
         
         if fl_param['model'] == 'scatter':
