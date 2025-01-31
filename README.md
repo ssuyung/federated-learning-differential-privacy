@@ -1,8 +1,16 @@
-# 260D Large Scale ML Project - Federated Learning with Differential Privacy: Decreasing Noise Mechanism
-
-# Federated Learning
+# Federated Learning with Differential Privacy: Decreasing Noise Mechanism
 
 This is an implementation of **Federated Learning (FL)** with **Differential Privacy (DP)**. The FL algorithm is FedAvg, based on the paper [Communication-Efficient Learning of Deep Networks from Decentralized Data](https://arxiv.org/abs/1602.05629). Each client trains local model by DP-SGD [2] to perturb model parameters. The noise multiplier is determined by [3-5] (see rdp_analysis.py). 
+
+## Introduction & Results
+(Details in LSML_Final_Report.pdf)
+Federated learning, combined with differential privacy, offers a robust approach to safeguarding sensitive data during distributed model training. In this study, we propose a decreasing noise mechanism to optimize the balance between privacy and model accuracy. By dynamically adjusting the gradient clipping size through a noise control parameter, noise_gamma, we explore the trade-offs between conver- gence rate and accuracy under fixed privacy budgets (ε, δ). Experiments conducted using Gaussian and Laplace noise on the MNIST dataset demonstrate that de- creasing noise improves model accuracy compared to fixed noise scales. Notably, Gaussian noise showed a slight accuracy enhancement for specific noise_gamma values, while Laplace noise yielded a modest 2–4% improvement. Our findings underline the importance of parameter tuning in achieving privacy-utility trade-offs, paving the way for future explorations into more complex datasets and models.
+
+![laplace_decreasing_noise](https://github.com/user-attachments/assets/b2d2403e-ef0a-465c-a069-4acd537c4ef8)  
+Laplace with decreasing noise, ε = 0.1  
+![guassion_decresing _noise](https://github.com/user-attachments/assets/ed192cca-8e26-4e06-ae61-f37e06ecafcb)  
+Gaussian with decreasing noise, ε = 0.5  
+
 
 ## Requirements
 - torch, torchvision
@@ -18,7 +26,7 @@ This is an implementation of **Federated Learning (FL)** with **Differential Pri
 
 > utils.py: sample MNIST in a non-i.i.d. manner
 
-## Usag
+## Usage
 Run test_cnn.ipynb
 
 ### FL model parameters
